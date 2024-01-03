@@ -8,7 +8,7 @@
 const int MAX_SPEED = 12000;
 const int HOME_SPEED = 1000;
 const int NORMAL_SPEED = 500;
-long TOTAL_X_STEPS = 29000;
+long TOTAL_X_STEPS = -29000;
 
 const int NUM_LEDS = 300;
 const int ROCKET_SMOKE_TIME = 5000;
@@ -45,6 +45,13 @@ const int MasterPin = A3;
 AccelStepper stepperX(motorInterfaceType, xStepPin, xDirPin);
 AccelStepper stepperY(motorInterfaceType, yStepPin, yDirPin);
 CRGB leds[NUM_LEDS];
+
+void initFlags () {
+  isOrbiting = true;
+  isReversing = false;
+  long initialHomingX=-1;
+  initialHomingY = -1;
+}
 
 void setup() {  
   Serial.begin(9600);
@@ -90,9 +97,9 @@ void loop() {
     stepperY.setSpeed(NORMAL_SPEED);
     stepperY.runSpeedToPosition();
 
-    // if (stepperY.distanceToGo() == 0 && stepperX.distanceToGo() == 0) {
-
-    // }
+    if (stepperY.distanceToGo() == 0 && stepperX.distanceToGo() == 0) {
+      initFlags();
+    }
   }
 }
 
@@ -105,7 +112,7 @@ void motorHoming(AccelStepper &motor, int homePin, int homeFlag) {
     motor.setMaxSpeed(MAX_SPEED);
     motor.setSpeed(HOME_SPEED);
     motor.runSpeedToPosition();
-    homeFlag--;
+    homeFlag++;
   }
 
   homeFlag = 1;
@@ -114,7 +121,7 @@ void motorHoming(AccelStepper &motor, int homePin, int homeFlag) {
     motor.setMaxSpeed(MAX_SPEED);
     motor.setSpeed(HOME_SPEED);
     motor.runSpeedToPosition();
-    homeFlag++;
+    homeFlag--;
   }
 
   motor.setCurrentPosition(0);

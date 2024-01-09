@@ -1,22 +1,26 @@
 #include <AccelStepper.h>
 #include <FastLED.h>
 
-// Define motor interface type
+// Define
+#define SECOND 1000UL
+#define MINUTE (SECOND * 60UL)
+#define HOUR (MINUTE * 60UL)
 #define motorInterfaceType 1
 
-// global constants
+// Global constants
 const int MAX_SPEED = 12000;
 const int HOME_SPEED = 1000;
 const int NORMAL_SPEED = 500;
-long TOTAL_X_STEPS = -29000;
+long TOTAL_X_STEPS = -28000;
 
 const int NUM_LEDS = 300;
-const int ROCKET_SMOKE_TIME = 5000;
-const int ROCKET_TO_EATH_ORBIT_TIME = 2000;
-const int EARTH_ORBIT_TIME = 5000;
-const int MOON_ORBIT_TIME = 5000;
-const int ORBITOR_TO_MOON_TIME = 2000;
-const int MOON_STAY_TIME = 2000;
+const unsigned long ROCKET_LIGHT_TIME = 10 * SECOND;
+const unsigned long ROCKET_SMOKE_TIME = 10 * SECOND;
+const unsigned long ROCKET_TO_EATH_ORBIT_TIME = 2 * SECOND;
+const unsigned long EARTH_ORBIT_TIME = 5 * SECOND;
+const unsigned long MOON_ORBIT_TIME = 1 * MINUTE;
+const unsigned long ORBITOR_TO_MOON_TIME = 2 * SECOND;
+const unsigned long MOON_STAY_TIME = 2 * SECOND;
 
 // global flags
 bool isOrbiting = true;
@@ -36,10 +40,12 @@ const int yDirPin = 6;
 const int yHomePin = 10;
 long initialHomingY=-1;
 
+// Define relay
+const int rocketLightPin = A3;
+const int smokePin = A2;
 const int LedDataPin = A1;
 const int orbitorPin = A0;
-const int smokePin = A2;
-const int MasterPin = A3;
+const int moonLightPin = 13;
 
 // Creates an instance
 AccelStepper stepperX(motorInterfaceType, xStepPin, xDirPin);
@@ -59,11 +65,17 @@ void setup() {
   pinMode(yHomePin, INPUT_PULLUP);
   pinMode(orbitorPin, OUTPUT);
   pinMode(smokePin, OUTPUT);
+  pinMode(rocketLightPin, OUTPUT);
+  pinMode(moonLightPin, OUTPUT);
   
+  digitalWrite(LedDataPin, HIGH);
+  digitalWrite(orbitorPin, HIGH);
+  digitalWrite(smokePin, HIGH);
+  digitalWrite(rocketLightPin, HIGH);
+  digitalWrite(moonLightPin, HIGH);
   digitalWrite(LedDataPin, LOW);
-  digitalWrite(LedDataPin, LOW);
-  FastLED.addLeds<WS2811, LedDataPin, RGB>(leds, NUM_LEDS);
 
+  FastLED.addLeds<WS2811, LedDataPin, RGB>(leds, NUM_LEDS);
   motorHoming(stepperX, xHomePin, initialHomingX);
   motorHoming(stepperY, yHomePin, initialHomingY);
 }
@@ -71,17 +83,23 @@ void setup() {
 void loop() {
   if (!isReversing) {
     if (stepperX.distanceToGo() != 0) {
+      digitalWrite(smokePin, LOW);
+      applyRocketSectionLights();
       stepperX.runSpeedToPosition();
     } else {
       if (isOrbiting) {
+        digitalWrite(smokePin, HIGH);
+        digitalWrite(rocketLightPin, HIGH);
         applyEarthOrbit();
         applyMoonOrbit();
         isOrbiting = false;
       } else {
-        if (stepperY.distanceToGo() != 0) {
+        if (stepperY.distanceToGo() != 0) {  
+          applyLanderSectionLights();        
           stepperY.runSpeedToPosition();
         } else {
             delay(MOON_STAY_TIME);
+            digitalWrite(moonLightPin, HIGH);
             isReversing = true;
         }
       }
@@ -133,29 +151,31 @@ void motorHoming(AccelStepper &motor, int homePin, int homeFlag) {
   delay(1000);
 }
 
-void applySmoke() {
-  digitalWrite(smokePin, HIGH);
-  delay(ROCKET_SMOKE_TIME);
-  digitalWrite(smokePin, LOW);
-}
-
 void applyEarthOrbit () {
   showLedStrip(51, 255, 255, 100, 10);
 }
 
 void applyMoonOrbit () {
-  digitalWrite(orbitorPin, HIGH);
-  delay(MOON_ORBIT_TIME);
+  digitalWrite(LedDataPin, LOW);
+
   digitalWrite(orbitorPin, LOW);
+  delay(MOON_ORBIT_TIME);
+  digitalWrite(orbitorPin, HIGH);
   delay(ORBITOR_TO_MOON_TIME);
 }
 
 void applyRocketSectionLights() {
+  digitalWrite(rocketLightPin, LOW);
+}
 
+void applySmoke() {
+  digitalWrite(smokePin, LOW);
+  delay(ROCKET_SMOKE_TIME);
+  digitalWrite(smokePin, HIGH);
 }
 
 void applyLanderSectionLights() {
-
+  digitalWrite(moonLightPin, LOW);
 }
 
 void showLedStrip(int R, int G, int B, int sleepMiliSec, int brightness) {

@@ -45,13 +45,15 @@ const int yDirPin = 6;
 const int yHomePin = 10;
 long initialHomingY=-1;
 
-// Define pins
-const int masterPin = 4;
+// Define relay pins
 const int rocketLightPin = A3;
-const int smokePin = A2;
-const int earthOrbitPin = A1;
-const int moonOrbitorPin = A0;
-const int moonLightPin = 12;
+const int smokePin = A0;
+const int moonOrbitorPin = A1;
+const int moonLightPin = A2;
+
+// Define other pins
+const int masterPin = 4;
+const int earthOrbitPin = 13;
 
 // Creates an instance
 AccelStepper stepperX(motorInterfaceType, xStepPin, xDirPin);

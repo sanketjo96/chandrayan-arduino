@@ -13,18 +13,21 @@ const int MAX_SPEED = 12000;
 const int HOME_SPEED = 1000;
 const int NORMAL_SPEED = 500;
 long TOTAL_X_STEPS = -28000;
-long TOTAL_Y_STEPS = -29000;
+long TOTAL_Y_STEPS = -30000;
 
 const int isPressed = LOW;
 const int isReleased = HIGH;
 
 const int NUM_LEDS = 300;
+const int THRUSTER1 = 64;
+const int THRUSTER2 = 146;
+const int THRUSTER3 = 246;
+
 const unsigned long ROCKET_SMOKE_TILL_STEPS = 6000;
-const unsigned long ROCKET_TO_EATH_ORBIT_TIME = 2 * SECOND;
-const unsigned long EARTH_ORBIT_TIME = 5 * SECOND;
-const unsigned long MOON_ORBIT_TIME = 30 * SECOND;
-const unsigned long ORBITOR_TO_MOON_TIME = 2 * SECOND;
-const unsigned long MOON_STAY_TIME = 30 * SECOND;
+const unsigned long ROCKET_TO_EATH_ORBIT_PAUSE = 2 * SECOND;
+const unsigned long MOON_ORBIT_TIME = 60 * SECOND;
+const unsigned long ORBITOR_TO_MOON_TIME = 10 * SECOND;
+const unsigned long MOON_STAY_TIME = 120 * SECOND;
 
 // global flags
 bool isOrbiting = true;
@@ -94,8 +97,8 @@ void setup() {
   FastLED.addLeds<WS2811, earthOrbitPin, RGB>(leds, NUM_LEDS);
   clearLEDStrip();
 
-  motorHoming(stepperX, xHomePin, initialHomingX, TOTAL_X_STEPS);
-  motorHoming(stepperY, yHomePin, initialHomingY, TOTAL_Y_STEPS);
+  motorHoming(stepperX, xHomePin, initialHomingX, TOTAL_X_STEPS, 1);
+  motorHoming(stepperY, yHomePin, initialHomingY, TOTAL_Y_STEPS, 2);
 }
 
 void loop() {
@@ -110,10 +113,15 @@ void loop() {
         stepperX.runSpeedToPosition();
       } else {
         if (isOrbiting) {
+          Serial.print("Earth orbit\n");
           digitalWrite(rocketLightPin, HIGH);
+          digitalWrite(moonLightPin, LOW);
           applyEarthOrbit();
+          digitalWrite(moonLightPin, HIGH);
+          Serial.print("Moon orbit\n");
           applyMoonOrbit();
           isOrbiting = false;
+          Serial.print("Start Lander\n");
         } else {
           if (stepperY.distanceToGo() != 0) {  
             digitalWrite(moonLightPin, LOW);     
@@ -122,6 +130,7 @@ void loop() {
               delay(MOON_STAY_TIME);
               digitalWrite(moonLightPin, HIGH);
               isReversing = true;
+              Serial.print("Reverse\n");
           }
         }
       }
@@ -138,18 +147,29 @@ void loop() {
 
       if (stepperY.distanceToGo() == 0 && stepperX.distanceToGo() == 0) {
         isTriggered = false;
+        motorInit(stepperX, TOTAL_X_STEPS);
+        motorInit(stepperY, TOTAL_Y_STEPS);
+        Serial.print("Back to Zero\n");
       }
     }
   } else {
     if (masterSwitchState == isPressed) {
       initFlags();
       isTriggered = true;
+      Serial.print("\nTriggered Rocket\n");
     }
   }
 }
 
-void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps) {
-  Serial.print("Motor is homing...\n");
+void motorInit(AccelStepper &motor, long totalSteps) {
+  motor.setCurrentPosition(0);
+  motor.moveTo(totalSteps);
+  motor.setMaxSpeed(MAX_SPEED);
+  motor.setSpeed(NORMAL_SPEED);
+}
+
+void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps, int index) {
+  Serial.print((String)"\nMotor is homing: " + index);
   delay(500);
 
   while(digitalRead(homePin)) {
@@ -174,7 +194,7 @@ void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps
   motor.setMaxSpeed(MAX_SPEED);
   motor.setSpeed(NORMAL_SPEED);
 
-  Serial.print("Motor is done...\n");
+  Serial.print((String)"\nMotor homing done: " + index);
   delay(1000);
 }
 
@@ -195,22 +215,48 @@ void applyMoonOrbit () {
   digitalWrite(moonOrbitorPin, LOW);
   delay(MOON_ORBIT_TIME);
   digitalWrite(moonOrbitorPin, HIGH);
-  delay(ORBITOR_TO_MOON_TIME);
+  // delay(ORBITOR_TO_MOON_TIME);
 }
 
 void applyEarthOrbit () {
-  showLedStrip(51, 255, 255, 100, 10);
+  showLedStrip(255);
 }
 
-void showLedStrip(int R, int G, int B, int sleepMiliSec, int brightness) {
+void showLedStrip(int brightness) {
   FastLED.setBrightness(brightness);
-   for(int whiteLed = 0; whiteLed < NUM_LEDS; whiteLed = whiteLed + 1) {
-      leds[whiteLed] =  CRGB(R,  G,  B);
-      FastLED.show();
-      if (sleepMiliSec) {
-        delay(sleepMiliSec);
-      }
-   }
+  int time = 300;
+  for(int i = 0; i < (NUM_LEDS - 1); i = i + 1) {
+    leds[i] =  CRGB(0, 255, 255);
+    leds[i + 1] =  CRGB(0, 255, 0);
+    FastLED.show();
+
+    time = fireThrusters(i, time);
+    delay(time);
+    
+    leds[i] =  CRGB(0, 0, 0);
+    leds[i + 1] =  CRGB(0, 0, 0);
+  }
+}
+
+void thrusterFireLight(int index) {
+  leds[index + 1] =  CRGB(255, 0, 0);
+  FastLED.show();
+  delay(120);
+}
+
+int fireThrusters(int i, int startTime) {
+  int time = startTime;
+  if (i == THRUSTER1) { 
+    thrusterFireLight(i);
+    time = 200;
+  } else if (i == THRUSTER2) {
+    thrusterFireLight(i);
+    time = 100;
+  } else if (i == THRUSTER3) {
+    thrusterFireLight(i);
+    time = 60;
+  }
+  return time;
 }
 
 void clearLEDStrip() {

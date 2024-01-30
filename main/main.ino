@@ -11,23 +11,25 @@
 // Global constants
 const int MAX_SPEED = 12000;
 const int HOME_SPEED = 1000;
-const int NORMAL_SPEED = 500;
-long TOTAL_X_STEPS = -28000;
+const int NORMAL_X_SPEED = 500;
+const int NORMAL_Y_SPEED = 370;
+long TOTAL_X_STEPS = -29000;
 long TOTAL_Y_STEPS = -30000;
 
 const int isPressed = LOW;
 const int isReleased = HIGH;
 
 const int NUM_LEDS = 300;
+const int LEDBLINKTIME = 300;
 const int THRUSTER1 = 64;
 const int THRUSTER2 = 146;
 const int THRUSTER3 = 246;
 
-const unsigned long ROCKET_SMOKE_TILL_STEPS = 6000;
+const unsigned long ROCKET_SMOKE_TILL_STEPS = 5000;
 const unsigned long ROCKET_TO_EATH_ORBIT_PAUSE = 2 * SECOND;
 const unsigned long MOON_ORBIT_TIME = 60 * SECOND;
 const unsigned long ORBITOR_TO_MOON_TIME = 10 * SECOND;
-const unsigned long MOON_STAY_TIME = 120 * SECOND;
+const unsigned long MOON_STAY_TIME = 150 * SECOND;
 
 // global flags
 bool isOrbiting = true;
@@ -97,8 +99,8 @@ void setup() {
   FastLED.addLeds<WS2811, earthOrbitPin, RGB>(leds, NUM_LEDS);
   clearLEDStrip();
 
-  motorHoming(stepperX, xHomePin, initialHomingX, TOTAL_X_STEPS, 1);
-  motorHoming(stepperY, yHomePin, initialHomingY, TOTAL_Y_STEPS, 2);
+  motorHoming(stepperX, xHomePin, initialHomingX, TOTAL_X_STEPS, NORMAL_X_SPEED, 1);
+  motorHoming(stepperY, yHomePin, initialHomingY, TOTAL_Y_STEPS, NORMAL_Y_SPEED, 2);
 }
 
 void loop() {
@@ -108,7 +110,6 @@ void loop() {
   if (isTriggered) {
     if (!isReversing) {
       if (stepperX.distanceToGo() != 0) {
-        digitalWrite(rocketLightPin, LOW);
         applySmoke(stepperX.distanceToGo());
         stepperX.runSpeedToPosition();
       } else {
@@ -121,34 +122,36 @@ void loop() {
           Serial.print("Moon orbit\n");
           applyMoonOrbit();
           isOrbiting = false;
+
+          delay(ORBITOR_TO_MOON_TIME);
           Serial.print("Start Lander\n");
         } else {
           if (stepperY.distanceToGo() != 0) {  
             digitalWrite(moonLightPin, LOW);     
             stepperY.runSpeedToPosition();
           } else {
-              delay(MOON_STAY_TIME);
-              digitalWrite(moonLightPin, HIGH);
-              isReversing = true;
-              Serial.print("Reverse\n");
+            delay(MOON_STAY_TIME);
+            digitalWrite(moonLightPin, HIGH);
+            isReversing = true;
+            Serial.print("Reverse\n");
           }
         }
       }
     } else {
       stepperX.moveTo(0);
       stepperX.setMaxSpeed(MAX_SPEED);
-      stepperX.setSpeed(NORMAL_SPEED);
+      stepperX.setSpeed(HOME_SPEED);
       stepperX.runSpeedToPosition();
 
       stepperY.moveTo(0);
       stepperY.setMaxSpeed(MAX_SPEED);
-      stepperY.setSpeed(NORMAL_SPEED);
+      stepperY.setSpeed(HOME_SPEED);
       stepperY.runSpeedToPosition();
 
       if (stepperY.distanceToGo() == 0 && stepperX.distanceToGo() == 0) {
         isTriggered = false;
-        motorInit(stepperX, TOTAL_X_STEPS);
-        motorInit(stepperY, TOTAL_Y_STEPS);
+        motorInit(stepperX, TOTAL_X_STEPS, NORMAL_X_SPEED);
+        motorInit(stepperY, TOTAL_Y_STEPS, NORMAL_Y_SPEED);
         Serial.print("Back to Zero\n");
       }
     }
@@ -161,14 +164,14 @@ void loop() {
   }
 }
 
-void motorInit(AccelStepper &motor, long totalSteps) {
+void motorInit(AccelStepper &motor, long totalSteps, int speed) {
   motor.setCurrentPosition(0);
   motor.moveTo(totalSteps);
   motor.setMaxSpeed(MAX_SPEED);
-  motor.setSpeed(NORMAL_SPEED);
+  motor.setSpeed(speed);
 }
 
-void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps, int index) {
+void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps, int speed, int index) {
   Serial.print((String)"\nMotor is homing: " + index);
   delay(500);
 
@@ -192,7 +195,7 @@ void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps
   motor.setCurrentPosition(0);
   motor.moveTo(totalSteps);
   motor.setMaxSpeed(MAX_SPEED);
-  motor.setSpeed(NORMAL_SPEED);
+  motor.setSpeed(speed);
 
   Serial.print((String)"\nMotor homing done: " + index);
   delay(1000);
@@ -200,9 +203,10 @@ void motorHoming(AccelStepper &motor, int homePin, int homeFlag, long totalSteps
 
 void applySmoke(long distanceToCover) {
   if (distanceToCover == TOTAL_X_STEPS) {
-    delay(2000);
     digitalWrite(smokePin, LOW);
-    delay(5000);
+    delay(2000);
+    digitalWrite(rocketLightPin, LOW);
+    delay(3000);
   }
 
   if (distanceToCover == (TOTAL_X_STEPS + ROCKET_SMOKE_TILL_STEPS)) {
@@ -224,7 +228,7 @@ void applyEarthOrbit () {
 
 void showLedStrip(int brightness) {
   FastLED.setBrightness(brightness);
-  int time = 300;
+  int time = LEDBLINKTIME;
   for(int i = 0; i < (NUM_LEDS - 1); i = i + 1) {
     leds[i] =  CRGB(0, 255, 255);
     leds[i + 1] =  CRGB(0, 255, 0);
@@ -248,13 +252,13 @@ int fireThrusters(int i, int startTime) {
   int time = startTime;
   if (i == THRUSTER1) { 
     thrusterFireLight(i);
-    time = 200;
+    time = 160;
   } else if (i == THRUSTER2) {
     thrusterFireLight(i);
     time = 100;
   } else if (i == THRUSTER3) {
     thrusterFireLight(i);
-    time = 60;
+    time = 62;
   }
   return time;
 }

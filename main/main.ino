@@ -11,8 +11,8 @@
 // Global constants
 const int MAX_SPEED = 12000;
 const int HOME_SPEED = 1000;
-const int NORMAL_X_SPEED = 500;
-const int NORMAL_Y_SPEED = 370;
+const int NORMAL_X_SPEED = 495;
+const int NORMAL_Y_SPEED = 380;
 long TOTAL_X_STEPS = -29000;
 long TOTAL_Y_STEPS = -30000;
 
@@ -29,7 +29,8 @@ const unsigned long ROCKET_SMOKE_TILL_STEPS = 5000;
 const unsigned long ROCKET_TO_EATH_ORBIT_PAUSE = 2 * SECOND;
 const unsigned long MOON_ORBIT_TIME = 60 * SECOND;
 const unsigned long ORBITOR_TO_MOON_TIME = 10 * SECOND;
-const unsigned long MOON_STAY_TIME = 150 * SECOND;
+const unsigned long DOOR_OPEN_LIGHT_DELAY = 35 * SECOND;
+const unsigned long MOON_STAY_TIME = 2 * MINUTE;
 
 // global flags
 bool isOrbiting = true;
@@ -51,10 +52,11 @@ const int yHomePin = 10;
 long initialHomingY=-1;
 
 // Define relay pins
-const int rocketLightPin = A3;
-const int smokePin = A0;
-const int moonOrbitorPin = A1;
-const int moonLightPin = A2;
+const int rocketLightPin = 12;
+const int smokePin = A3;
+const int moonOrbitorPin = A0;
+const int moonLightPin = A1;
+const int shivShaktiLightPin = A2;
 
 // Define other pins
 const int masterPin = 4;
@@ -80,17 +82,19 @@ void initPins () {
   digitalWrite(smokePin, HIGH);
   digitalWrite(moonOrbitorPin, HIGH);
   digitalWrite(moonLightPin, HIGH);
+  digitalWrite(shivShaktiLightPin, HIGH);
 }
 
 void setup() {  
   Serial.begin(9600);
-  //pinMode(masterPin, INPUT_PULLUP);
   pinMode(xHomePin, INPUT_PULLUP);
   pinMode(yHomePin, INPUT_PULLUP);
-  pinMode(moonOrbitorPin, OUTPUT);
+
   pinMode(smokePin, OUTPUT);
   pinMode(rocketLightPin, OUTPUT);
+  pinMode(moonOrbitorPin, OUTPUT);
   pinMode(moonLightPin, OUTPUT);
+  pinMode(shivShaktiLightPin, OUTPUT);
 
   masterSwitch.setDebounceTime(50);
   
@@ -130,9 +134,16 @@ void loop() {
             digitalWrite(moonLightPin, LOW);     
             stepperY.runSpeedToPosition();
           } else {
-            delay(MOON_STAY_TIME);
+            delay(DOOR_OPEN_LIGHT_DELAY);
             digitalWrite(moonLightPin, HIGH);
+            digitalWrite(shivShaktiLightPin, LOW);
+            delay(MOON_STAY_TIME);
+            digitalWrite(shivShaktiLightPin, HIGH);
             isReversing = true;
+            
+            // Delay reverse by 1 min anyways. To help
+            // attendent to close doors manually
+            delay(1000);
             Serial.print("Reverse\n");
           }
         }
@@ -243,7 +254,7 @@ void showLedStrip(int brightness) {
 }
 
 void thrusterFireLight(int index) {
-  leds[index + 1] =  CRGB(255, 0, 0);
+  leds[index] =  CRGB(255, 255, 0);
   FastLED.show();
   delay(120);
 }
